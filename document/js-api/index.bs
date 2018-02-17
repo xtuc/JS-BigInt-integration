@@ -20,6 +20,12 @@ Prepare For TR: true
     "title": "WebAssembly Specification",
     "publisher": "W3C WebAssembly Community Group",
     "status": "Draft"
+  },
+  "BIGINT": {
+    "href": "https://tc39.github.io/proposal-bigint/",
+    "title": "BigInt Specification",
+    "publisher": "TC39",
+    "status": "Stage 3 proposal"
   }
 }
 </pre>
@@ -154,6 +160,10 @@ urlPrefix: https://webassembly.github.io/spec/core/multipage/; spec: WebAssembly
         text: 𝗀𝗅𝗈𝖻𝖺𝗅
     text: global type; url: syntax/types.html#syntax-globaltype
     text: address; url: exec/runtime.html#addresses
+    text: signed_64; url: exec/numerics.html#aux-signed
+urlPrefix: https://tc39.github.io/proposal-bigint/; spec: BIGINT; type: dfn
+    text: ToBigInt64; url: #sec-to-big-int64
+    text: BigInt; url: #sec-ecmascript-language-types-bigint-type
 </pre>
 
 <pre class='link-defaults'>
@@ -333,7 +343,6 @@ A {{Module}} object represents a single WebAssembly module. Each {{Module}} obje
             1. Let |externfunc| be the [=external value=] [=external value|𝖿𝗎𝗇𝖼=] |funcaddr|.
             1. [=Append=] |externfunc| to |imports|.
         1. If |externtype| is of the form [=𝗀𝗅𝗈𝖻𝖺𝗅=] |globaltype|,
-            1. If |globaltype| is [=𝗂𝟨𝟦=] or [=Type=](|v|) is not [=Number=], throw a {{LinkError}} exception.
             1. Let |value| be [=ToWebAssemblyValue=](|v|, |globaltype|.<em>[=global type|valtype=]</em>)
             1. Assert: |globaltype|.<em>[=global type|mut=]</em> is [=global type|𝖼𝗈𝗇𝗌𝗍=], as verified by WebAssembly validation.
             1. Let |store| be the [=surrounding agent=]'s [=associated store=].
@@ -371,7 +380,6 @@ A {{Module}} object represents a single WebAssembly module. Each {{Module}} obje
             1. Let |func| be the result of creating [=a new Exported Function=] from |funcaddr|.
             1. Let |value| be |func|.
         1. If |externtype| is of the form [=𝗀𝗅𝗈𝖻𝖺𝗅=] |globaltype|,
-            1. If |globaltype|.<em>[=global type|valtype=]</em>) is [=𝗂𝟨𝟦=], throw a {{LinkError}} exception.
             1. Assert: |globaltype|.<em>[=global type|mut=]</em> is [=global type|𝖼𝗈𝗇𝗌𝗍=], as verified by WebAssembly validation.
             1. Assert: |externval| is of the form [=external value|𝗀𝗅𝗈𝖻𝖺𝗅=] |globaladdr|.
             1. Let [=external value|𝗀𝗅𝗈𝖻𝖺𝗅=] |globaladdr| be |externval|.
@@ -741,10 +749,6 @@ This slot holds a [=function address=] relative to the [=surrounding agent=]'s [
     1. Let |store| be the [=surrounding agent=]'s [=associated store=].
     1. Let |functype| be [=type_func=](|store|, |funcaddr|).
     1. Let [|parameters|] → [|results|] be |functype|.
-    1. If |parameters| or |results| contains an [=𝗂𝟨𝟦=], throw a {{TypeError}}.
-
-        Note: the above error is thrown each time the \[[Call]] method is invoked.
-
     5. Let |args| be an empty list of WebAssembly values.
     1. Let |i| be 0.
     1. For each type |t| of |parameters|,
@@ -767,7 +771,6 @@ Note: Exported Functions do not have a \[[Construct]] method and thus it is not 
   To <dfn>create a host function</dfn> from the JavaScript object |func|, perform the following steps:
 
     1. Let |hostfunc| be a [=host function=] which performs the following steps when called:
-        1. If the signature contains an [=𝗂𝟨𝟦=] (as argument or result), the host function throws a {{TypeError}} when called.
         1. Let |arguments| be a [=list=] of the arguments of the invocation of this function.
         1. Let |jsArguments| be an empty [=list=].
         1. For each |arg| in |arguments|,
@@ -785,10 +788,12 @@ Note: Exported Functions do not have a \[[Construct]] method and thus it is not 
 <div algorithm>
 The algorithm <dfn>ToJSValue</dfn>(|w|) coerces a [=WebAssembly value=] to a JavaScript value performs the following steps:
 
-Assert: |w| is not of the form [=𝗂𝟨𝟦.𝖼𝗈𝗇𝗌𝗍=] |i64|.
-1. If |w| is of the form [=𝗂𝟥𝟤.𝖼𝗈𝗇𝗌𝗍=] |i32|, return [=the Number value=] for |i32|.
-1. If |w| is of the form [=𝖿𝟥𝟤.𝖼𝗈𝗇𝗌𝗍=] |f32|, return [=the Number value=] for |f32|.
-1. If |w| is of the form [=𝖿𝟨𝟦.𝖼𝗈𝗇𝗌𝗍=] |f64|, return [=the Number value=] for |f64|.
+1. If |w| is of the form [=𝗂𝟨𝟦.𝖼𝗈𝗇𝗌𝗍=] |i64|,
+    1. Let |v| be [=signed_64=](|i64|).
+    1. Return a [=BigInt=] representing the mathematical value |v|.
+1. If |w| is of the form [=𝗂𝟥𝟤.𝖼𝗈𝗇𝗌𝗍=] |i32|, return [=the Number value=] of |i32|.
+1. If |w| is of the form [=𝖿𝟥𝟤.𝖼𝗈𝗇𝗌𝗍=] |f32|, return [=the Number value=] of |f32|.
+1. If |w| is of the form [=𝖿𝟨𝟦.𝖼𝗈𝗇𝗌𝗍=] |f64|, return [=the Number value=] of |f64|.
 
 <!-- If the WebAssembly value is optional, then given `None`, return JavaScript value `undefined`. -->
 
@@ -799,7 +804,9 @@ Note: Implementations may optionally replace the NaN payload with any other NaN 
 The algorithm <dfn>ToWebAssemblyValue</dfn>(|v|, |type|) coerce a JavaScript value to a [=WebAssembly value=]  performs the following steps:
 
 
-Assert: |type| is not [=𝗂𝟨𝟦=].
+1. If |type| is [=𝗂𝟨𝟦=],
+    1. Let |i64| be [=ToBigInt64=](|v|).
+    1. Return [=𝗂𝟨𝟦.𝖼𝗈𝗇𝗌𝗍=] |i64|.
 1. If |type| is [=𝗂𝟥𝟤=],
     1. Let |i32| be ? [=ToInt32=](|v|).
     1. Return [=𝗂𝟥𝟤.𝖼𝗈𝗇𝗌𝗍=] |i32|.

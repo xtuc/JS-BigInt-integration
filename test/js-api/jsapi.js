@@ -881,4 +881,57 @@ test(() => {
   assert_equals(table.get(2)(), 46);
 }, "Tables export cached");
 
+const exportingModuleLongIdentityFn = (() => {
+    let builder = new WasmModuleBuilder();
+
+    builder
+        .addFunction('id', kSig_l_l)
+        .addBody([ kExprGetLocal, 0 ])
+        .exportFunc();
+
+    return builder.toBuffer();
+})();
+
+test(() => {
+  let module = new WebAssembly.Module(exportingModuleLongIdentityFn);
+  let instance = new WebAssembly.Instance(module);
+
+  let value = 2n ** 63n;
+  let output = instance.exports.id(value);
+  assert_equals(output, - (2n ** 63n));
+  assertThrows(() => instance.exports.id(5), TypeError);
+  assert_equals(instance.exports.id("5"), 5n);
+}, "WebAssembly longs are converted to JavaScript as if by ToBigInt64 in exported functions");
+
+const exportingModuleImportingLongFn = (() => {
+    let builder = new WasmModuleBuilder();
+
+    let fnIndex = builder.addImport('mod', 'fn', kSig_l_l);
+    let globalIndex = builder.addImportedGlobal('mod', 'gl', kWasmI64);
+
+    builder.addExport('fn', fnIndex)
+    builder.addExportOfKind('gl', kExternalGlobal, globalIndex)
+
+    return builder.toBuffer();
+})();
+
+test(() => {
+  let module = new WebAssembly.Module(exportingModuleImportingLongFn);
+  let input;
+  let instance = new WebAssembly.Instance(module, {
+    mod: {
+      fn(arg) {
+        input = arg;
+        return 2n ** 63n;
+      },
+      gl: 2n ** 63n,
+    }
+  });
+
+  let output = instance.exports.fn(2n ** 63n);
+  assert_equals(input, - (2n ** 63n));
+  assert_equals(output, - (2n ** 63n));
+  assert_equals(instance.exports.gl, - (2n ** 63n));
+}, "WebAssembly longs are converted to JavaScript as if by ToBigInt64 in host functions");
+
 })();
